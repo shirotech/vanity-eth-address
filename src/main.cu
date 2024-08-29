@@ -36,6 +36,7 @@
 #include "cpu_curve_math.h"
 #include "cpu_keccak.h"
 #include "cpu_math.h"
+#include "keccak.h"
 
 
 #define OUTPUT_BUFFER_SIZE 10000
@@ -101,6 +102,24 @@ __device__ void handle_output(int score_method, Address a, uint64_t key, bool in
     int score = 0;
     if (score_method == 0) { score = score_leading_zeros(a); }
     else if (score_method == 1) { score = score_zero_bytes(a); }
+
+    if (score >= device_memory[1]) {
+        atomicMax_ul(&device_memory[1], score);
+        if (score >= device_memory[1]) {
+            uint32_t idx = atomicAdd_ul(&device_memory[0], 1);
+            if (idx < OUTPUT_BUFFER_SIZE) {
+                device_memory[2 + idx] = key;
+                device_memory[OUTPUT_BUFFER_SIZE + 2 + idx] = score;
+                device_memory[OUTPUT_BUFFER_SIZE * 2 + 2 + idx] = inv;
+            }
+        }
+    }
+}
+
+__device__ void handle_output_union(int score_method, Address a, uint64_t key, bool inv) {
+    int score = 0;
+    if (score_method == 0) { score = score_leading_zeros(a) & score_leading_zeros(calculate_contract_address(a)); }
+    else if (score_method == 1) { score = score_zero_bytes(a) & score_zero_bytes(calculate_contract_address(a)); }
 
     if (score >= device_memory[1]) {
         atomicMax_ul(&device_memory[1], score);
@@ -269,7 +288,7 @@ void host_thread(int device, int device_index, int score_method, int mode, Addre
         cudaStream_t streams[2];
         gpu_assert(cudaStreamCreate(&streams[0]))
         gpu_assert(cudaStreamCreate(&streams[1]))
-        
+
         _uint256 previous_random_key = random_key;
         bool first_iteration = true;
         uint64_t start_time;
@@ -347,7 +366,7 @@ void host_thread(int device, int device_index, int score_method, int mode, Addre
                             if (output_buffer3_host[i]) {
                                 k = cpu_sub_256(N, k);
                             }
-                
+
                             int idx = valid_results++;
                             results[idx] = k;
                             scores[idx] = output_buffer2_host[i];
@@ -418,7 +437,7 @@ void host_thread(int device, int device_index, int score_method, int mode, Addre
 
                         uint64_t k_offset = output_buffer_host[i];
                         _uint256 k = cpu_add_256(random_key, _uint256{0, 0, 0, 0, 0, 0, (uint32_t)(k_offset >> 32), (uint32_t)(k_offset & 0xFFFFFFFF)});
-            
+
                         int idx = valid_results++;
                         results[idx] = k;
                         scores[idx] = output_buffer2_host[i];
@@ -485,7 +504,7 @@ void host_thread(int device, int device_index, int score_method, int mode, Addre
 
                         uint64_t k_offset = output_buffer_host[i];
                         _uint256 k = cpu_add_256(random_key, _uint256{0, 0, 0, 0, 0, 0, (uint32_t)(k_offset >> 32), (uint32_t)(k_offset & 0xFFFFFFFF)});
-            
+
                         int idx = valid_results++;
                         results[idx] = k;
                         scores[idx] = output_buffer2_host[i];
@@ -619,7 +638,7 @@ int main(int argc, char *argv[]) {
             printf("Failed to open the bytecode file.\n");
             return 1;
         }
-        
+
         int file_size = 0;
         {
             infile.seekg(0, std::ios::end);
@@ -660,7 +679,7 @@ int main(int argc, char *argv[]) {
             }
 
             bytecode[i - prefix] = (uint8_t)strtol(byte, 0, 16);
-        }    
+        }
         bytecode_hash = cpu_full_keccak(bytecode, (file_size >> 1) - prefix);
         delete[] bytecode;
     }

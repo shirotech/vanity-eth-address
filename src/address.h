@@ -65,8 +65,8 @@ __global__ void __launch_bounds__(BLOCK_SIZE, 2) gpu_address_work(int score_meth
 
     CurvePoint p = offsets[thread_id];
 
-    handle_output(score_method, calculate_address(p.x, p.y), key, 0);
-    handle_output(score_method, calculate_address(p.x, sub_256(P, p.y)), key, 1);
+    handle_output_union(score_method, calculate_address(p.x, p.y), key, 0);
+    handle_output_union(score_method, calculate_address(p.x, sub_256(P, p.y)), key, 1);
 
 
     _uint256 z[THREAD_WORK - 1];
@@ -87,8 +87,8 @@ __global__ void __launch_bounds__(BLOCK_SIZE, 2) gpu_address_work(int score_meth
         _uint256 curve_x = sub_256_mod_p(sub_256_mod_p(mul_256_mod_p(lambda, lambda), p.x), addends[i].x);
         _uint256 curve_y = sub_256_mod_p(mul_256_mod_p(lambda, sub_256_mod_p(p.x, curve_x)), p.y);
 
-        handle_output(score_method, calculate_address(curve_x, curve_y), key + i + 1, 0);
-        handle_output(score_method, calculate_address(curve_x, sub_256(P, curve_y)), key + i + 1, 1);
+        handle_output_union(score_method, calculate_address(curve_x, curve_y), key + i + 1, 0);
+        handle_output_union(score_method, calculate_address(curve_x, sub_256(P, curve_y)), key + i + 1, 1);
     }
 
     _uint256 y = q;
@@ -97,6 +97,6 @@ __global__ void __launch_bounds__(BLOCK_SIZE, 2) gpu_address_work(int score_meth
     _uint256 curve_x = sub_256_mod_p(sub_256_mod_p(mul_256_mod_p(lambda, lambda), p.x), addends[0].x);
     _uint256 curve_y = sub_256_mod_p(mul_256_mod_p(lambda, sub_256_mod_p(p.x, curve_x)), p.y);
 
-    handle_output(score_method, calculate_address(curve_x, curve_y), key + 1, 0);
-    handle_output(score_method, calculate_address(curve_x, sub_256(P, curve_y)), key + 1, 1);
+    handle_output_union(score_method, calculate_address(curve_x, curve_y), key + 1, 0);
+    handle_output_union(score_method, calculate_address(curve_x, sub_256(P, curve_y)), key + 1, 1);
 }
